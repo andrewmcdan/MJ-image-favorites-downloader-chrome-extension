@@ -1,7 +1,7 @@
 const backgroundMessage = async (property,msg) => {
     let messageRes = null;
     const handleRes = (e) => {
-        console.log({e});
+        // console.log({e});
         if(e.hasOwnProperty(property)){
             console.log(property, e);
             messageRes = e[property];
@@ -77,54 +77,59 @@ class mainScript{
 }
 
 
-console.log('connecting to background script');
+console.log('Connecting to background script');
 // Establish a connection to the background script
 var port = chrome.runtime.connect({ name: "content-script" });
 
-let doLoop = true;
+if(!port){
+    console.log('Unable to connect to background script');
+}else{
+    console.log('Connected to background script');
+}
+// let doLoop = true;
 
-port.postMessage({ greeting: "hello from content script" });
+// port.postMessage({ greeting: "hello from content script" });
 
-port.onMessage.addListener(function (msg) {
-    if(msg.hasOwnProperty('returnData')){
-        console.log({ returnData: msg.returnData });
-        doLoop = false;
-    }
-    // calculate time remaining from seconds
-    let timeLeft = msg.remainingTime;
-    let seconds = Math.floor(timeLeft / 1000);
-    let minutes = Math.floor(seconds / 60);
-    let hours = Math.floor(minutes / 60);
-    console.log("Message from background:", msg, `Remaining time: ${hours} hours, ${minutes % 60} minutes, and ${seconds % 60} seconds.`);
-});
+// port.onMessage.addListener(function (msg) {
+//     if(msg.hasOwnProperty('returnData')){
+//         console.log({ returnData: msg.returnData });
+//         doLoop = false;
+//     }
+//     // calculate time remaining from seconds
+//     let timeLeft = msg.remainingTime;
+//     let seconds = Math.floor(timeLeft / 1000);
+//     let minutes = Math.floor(seconds / 60);
+//     let hours = Math.floor(minutes / 60);
+//     console.log("Message from background:", msg, `Remaining time: ${hours} hours, ${minutes % 60} minutes, and ${seconds % 60} seconds.`);
+// });
 
 const waitSeconds = (s) => new Promise(resolve => setTimeout(resolve, 1000 * s));
-const loop = async () => {
-    while (doLoop) {
-        await waitSeconds(3);
-        await port.postMessage({ msg: 'totalJobs' }, function (response) {
-            console.log({ response });
-        });
-    }
-}
+// const loop = async () => {
+//     while (doLoop) {
+//         await waitSeconds(3);
+//         await port.postMessage({ msg: 'totalJobs' }, function (response) {
+//             console.log({ response });
+//         });
+//     }
+// }
 
 
-const andGo = () => {
-    let userID = document.getElementById('userID').value;
-    port.postMessage({ msg: 'go', userID: userID }, function (response) {
-        console.log({ response });
-    });
-}
+// const andGo = () => {
+//     let userID = document.getElementById('userID').value;
+//     port.postMessage({ msg: 'go', userID: userID }, function (response) {
+//         console.log({ response });
+//     });
+// }
 
 
-window.dispatchEvent(new CustomEvent('content-script-event', {detail: {greeting: 'hello from content script'}}));
+// window.dispatchEvent(new CustomEvent('content-script-event', {detail: {greeting: 'hello from content script'}}));
 
-window.addEventListener('main-script-event', function (e) {
-    console.log('main script sent event', e);
-    if(e.detail == 'andGo'){
-        andGo();
-    }
-});
+// window.addEventListener('main-script-event', function (e) {
+//     console.log('main script sent event', e);
+//     if(e.detail == 'andGo'){
+//         andGo();
+//     }
+// });
 
 let mainScripts = [];
 

@@ -7,14 +7,14 @@ let theDataReady = false;
 let userIDFromPage = "";
 let jobStatus = "waiting";
 chrome.runtime.onConnect.addListener(function (port) {
-    console.assert(port.name === "content-script");
+    // console.assert(port.name === "content-script");
     port.onMessage.addListener(async function (msg, sendResponse) {
-        console.log("Message from content1:", {msg}, {sendResponse});
+        console.log("Message from content1:", { msg }, { sendResponse });
         if (msg.msg == 'totalJobs') {
             port.postMessage({ reply: "ok", totalJobs: totalJobs, remainingTime: remainingTime });
-            if (theDataReady) {
-                port.postMessage({ reply: "theData", returnData: theData });
-            }
+            // if (theDataReady) {
+            //     port.postMessage({ reply: "theData", returnData: theData });
+            // }
         }
         if (msg.msg == 'go') {
             port.postMessage({ reply: "ok" });
@@ -40,29 +40,36 @@ chrome.runtime.onConnect.addListener(function (port) {
             let jobD = await getJobDataImage(msg.uuid);
             port.postMessage({ reply: "jobDataImage", jobDataImage: jobD });
         }
-        if(msg.msg == 'getJobDataUser'){
+        if (msg.msg == 'getJobDataUser') {
             port.postMessage({ reply: "ok" });
-            console.log({ msg })
-            let jobD = await getData(msg.data.uuid, {start: msg.data.startDate, end: msg.data.endDate});
+            // console.log({ msg })
+            let jobD = await getData(msg.data.uuid, { start: msg.data.startDate, end: msg.data.endDate });
             port.postMessage({ reply: "jobDataUser", jobDataUser: jobD });
         }
-        if(msg.msg == 'getThisUserJobsData'){
+        if (msg.msg == 'getThisUserJobsData') {
             port.postMessage({ reply: "ok" });
             let jobD = await getThisUserJobsData();
             port.postMessage({ reply: "thisUserJobsData", thisUserJobsData: jobD });
         }
-        if(msg.msg == 'reloadExt'){
-            console.log('reload extension called for (background script)');
+        if (msg.msg == 'reloadExt') {
+            // console.log('reload extension called for (background script)');
             port.postMessage({ reply: "ok" });
             reloadExtension();
         }
-        if(msg.msg == 'getRemainingTime'){
+        if (msg.msg == 'getRemainingTime') {
             port.postMessage({ reply: "ok", remainingTime: remainingTime });
         }
-        if(msg.msg == 'getJobStatus'){
-            port.postMessage({ reply: "ok - getJobStatus" });
+        if (msg.msg == 'getJobStatus') {
+            port.postMessage({ reply: "ok" });
             let jobD = getJobStatus();
             port.postMessage({ reply: "jobStatus", jobStatus: jobD });
+        }
+        if (msg.msg = "getIfJobUserOrImage") {
+            port.postMessage({ reply: "ok" });
+            if (msg.uuid !== undefined && msg.uuid !== null && msg.uuid !== "") {
+                let jobD = await getIfJobUserOrImage(msg.uuid);
+                port.postMessage({ reply: "jobType", jobType: jobD });
+            }
         }
     });
 });
@@ -97,26 +104,19 @@ const getData = async (uuid = null, dateObj = null) => {
     totalJobs = 0;
     currentJobNumber = 0;
     remainingTime = -1;
-
-
     let userID;
-    if (userIDFromPage === "") {
-        userID = await getUserID();
-    } else {
-        userID = userIDFromPage;
-    }
-    if(uuid !== null){
-        userID = uuid;
-    }
+    if (userIDFromPage === "") userID = await getUserID();
+    else userID = userIDFromPage;
+    if (uuid !== null) userID = uuid;
     let startTimestamp = Date.now();
     let returnData = [];
     let archiveData = [];
     let startDate;
     let endDate;
-    if(dateObj === null){
-        startDate = new Date("October 01, 2023");
+    if (dateObj === null) {
+        startDate = new Date("October 06, 2023");
         endDate = new Date("October 06, 2023");
-    }else{
+    } else {
         // convert date string into better date string because JS is stupid and insists on using UTC
         let year = dateObj.start.split("-")[0];
         let month = dateObj.start.split("-")[1];
@@ -205,8 +205,7 @@ const getData = async (uuid = null, dateObj = null) => {
             console.log({ redoJobs });
             for (const jobId of redoJobs) {
                 await waitSeconds(0.1);
-
-                console.log({ jobId });
+                // console.log({ jobId });
                 let jobStatusResponse;
                 let fetchWait = fetch("https://www.midjourney.com/api/app/job-status/", {
                     method: "POST",
@@ -241,62 +240,38 @@ const getThisUserJobsData = async () => {
     let numberOfJobsReturned = 0;
     let returnedData = [];
     let cursor = "";
-
     let loopCount = 0;
-    do{
-        let response = await fetch("https://beta.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor), {
-            "headers": {
-              "accept": "*/*",
-              "accept-language": "en-US,en;q=0.9",
-              "cache-control": "no-cache",
-              "content-type": "application/json",
-              "pragma": "no-cache",
-              "sec-ch-ua": "\"Chromium\";v=\"118\", \"Google Chrome\";v=\"118\", \"Not=A?Brand\";v=\"99\"",
-              "sec-ch-ua-mobile": "?0",
-              "sec-ch-ua-platform": "\"Windows\"",
-              "sec-fetch-dest": "empty",
-              "sec-fetch-mode": "no-cors",
-              "sec-fetch-site": "same-origin",
-              "cookie": "_ga=GA1.1.167389610.1696560556; intercom-id-gp8wgfwe=c08504b0-3745-497f-b33b-abc4fd1bf5cc; intercom-device-id-gp8wgfwe=ae7b76b3-959c-476e-86d9-f1f07410bd8f; AMP_MKTG_437c42b22c=JTdCJTdE; AMP_437c42b22c=JTdCJTIyZGV2aWNlSWQlMjIlM0ElMjIxNTkzOTUxMy1kOWVhLTQ2M2MtODAwMi0xMGQ1NWZiZGIzYjclMjIlMkMlMjJ1c2VySWQlMjIlM0ElMjJmNjZiYTY1Ni1mYzFiLTQzNjYtOGVjOC1jZjUyY2JjNDczMDklMjIlMkMlMjJzZXNzaW9uSWQlMjIlM0ExNjk4MTAzMzQ3ODU4JTJDJTIyb3B0T3V0JTIyJTNBZmFsc2UlMkMlMjJsYXN0RXZlbnRUaW1lJTIyJTNBMTY5ODEwNDk3NzQ1NCUyQyUyMmxhc3RFdmVudElkJTIyJTNBMzA3JTdE; _ga_Q0DQ5L7K0D=GS1.1.1698103347.36.1.1698104978.0.0.0; AMP_MKTG_74801b10c7=JTdCJTdE; cf_clearance=M5ifSC5XkRqqeIDNjYXC39zCbFLRdihOtC3rHelLRVQ-1698106961-0-1-e1a9dc1f.96e76b22.b7d06228-0.2.1698106961; Midjourney.AuthUserToken=eyJpZFRva2VuIjoiZXlKaGJHY2lPaUpTVXpJMU5pSXNJbXRwWkNJNklqQXpaREEzWW1Kak0yUTNOV00yT1RReU56VXhNR1kyTVRjMFpXSXlaakUyTlRRM1pEUmhOMlFpTENKMGVYQWlPaUpLVjFRaWZRLmV5SnVZVzFsSWpvaVlTNXRZMlF1SWl3aWNHbGpkSFZ5WlNJNklqTmhOMlZpTmpNeVlUQXlZV1kxTVRRNVlXVmhPV0ZoTjJNeFpUaGhNV1F4SWl3aWJXbGthbTkxY201bGVWOXBaQ0k2SW1ZMk5tSmhOalUyTFdaak1XSXRORE0yTmkwNFpXTTRMV05tTlRKalltTTBOek13T1NJc0ltbHpjeUk2SW1oMGRIQnpPaTh2YzJWamRYSmxkRzlyWlc0dVoyOXZaMnhsTG1OdmJTOWhkWFJvYW05MWNtNWxlU0lzSW1GMVpDSTZJbUYxZEdocWIzVnlibVY1SWl3aVlYVjBhRjkwYVcxbElqb3hOams0TVRBMk9UY3hMQ0oxYzJWeVgybGtJam9pUkhsbVpVcDJTbVYyWjFaaFl6RnJUbkJXT1dwTU9VbDJPRFIzTVNJc0luTjFZaUk2SWtSNVptVktka3BsZG1kV1lXTXhhMDV3VmpscVREbEpkamcwZHpFaUxDSnBZWFFpT2pFMk9UZ3hNRFk1TnpFc0ltVjRjQ0k2TVRZNU9ERXhNRFUzTVN3aVpXMWhhV3dpT2lKaGJtUnlaWGR0WTJSaGJrQm5iV0ZwYkM1amIyMGlMQ0psYldGcGJGOTJaWEpwWm1sbFpDSTZkSEoxWlN3aVptbHlaV0poYzJVaU9uc2lhV1JsYm5ScGRHbGxjeUk2ZXlKa2FYTmpiM0prTG1OdmJTSTZXeUl4TnpReU9UVXpPVEF3TmpneU56Y3lORGdpWFN3aVpXMWhhV3dpT2xzaVlXNWtjbVYzYldOa1lXNUFaMjFoYVd3dVkyOXRJbDE5TENKemFXZHVYMmx1WDNCeWIzWnBaR1Z5SWpvaVpHbHpZMjl5WkM1amIyMGlmWDAuT2pGbkxUTDJFUmpDQ1FKWWFLQl94QVNTUTNqck5ZSlZhOUpaWW01MnZidkJYQ2FkM3l3STNteW1FREhEcGZsMkNYNGFmMVBzWV9jT3dEc2M5NUZZT082UkN5SGswVklUZlVkNEotcGdfMXhYYUYyS1ZQaTM3MGNFMFB3WWdCcnNabUQ5TmNZM3pxVVduclBUd3piWU9xLUFIOVZ3QUtxdWtGQThPQmtiUHR0ZHZDWGEwemdFMDNfdThTUVdzdVdTZGZ6ZXZ2RXRaM0RXTDJoRGloZ2RoTndoUDZpTHRwLTBuRmNtVjItem1GNjduSng0ZVZ4ZURKX2VXR1dpSmhfQW1UR1FaendocXdGRFl2MVFWX0gyTVctcnZKR2pKS1FLR0hGS0t0SF82QkpveG00c0t1dTN1SjJZenVZSDhwT3BPZXUxc19vMWhZRzBsTXNORFRWV2xRIiwicmVmcmVzaFRva2VuIjoiQU1mLXZCejUzU1dFdVJDT1NNZDd1dXFSZjU5RWloVmx1NmRIWnVPTUp5WUxzTkstYnVMWFV4TjRXWUVQRTFDRnRPQkJRTHA1b1RJN0VIdmVUWG1KOHpLOFFrRmIwTDd5dVd3dUlwcjFUOWxlNnNMeGVsZ1pESlJZclEyeUxtSDZzTEk5bGRFWjZhNURYV2l1NlVLcXliRUs4d2Y4bVdNdy02Z2R3YmhUZ1BLZVV6VjlEcnFJOU0xM3lILWdoMzVmcGU0XzdHeEpKYTloajE3T0JrUkRiUXpidEhsb3kxaEd5RFctd0tfSU5ZWWNWVHhnLTUwMHZ3SkkzaXFpUlNBcnpwVnBLWXpUV0lQaS1xRzFucUljWGg3Q1dPUUJDclB5dGY3ZXlaZGRydGJoNnZTTXRSUVZDOWMifQ; Midjourney.AuthUserToken.sig=-PAFXF4J32BFPY9owU3IQr3Ah2JXM-1kGcP58JBIVes; Midjourney.AuthUser=eyJpZCI6IkR5ZmVKdkpldmdWYWMxa05wVjlqTDlJdjg0dzEiLCJtaWRqb3VybmV5X2lkIjoiZjY2YmE2NTYtZmMxYi00MzY2LThlYzgtY2Y1MmNiYzQ3MzA5IiwiZW1haWwiOiJhbmRyZXdtY2RhbkBnbWFpbC5jb20iLCJlbWFpbFZlcmlmaWVkIjp0cnVlLCJwaG9uZU51bWJlciI6bnVsbCwiZGlzcGxheU5hbWUiOiJhLm1jZC4iLCJwaG90b1VSTCI6IjNhN2ViNjMyYTAyYWY1MTQ5YWVhOWFhN2MxZThhMWQxIiwiYWJpbGl0aWVzIjp7ImFkbWluIjpmYWxzZSwiZGV2ZWxvcGVyIjpmYWxzZSwiYWNjZXB0ZWRfdG9zIjp0cnVlLCJtb2RlcmF0b3IiOmZhbHNlLCJndWlkZSI6ZmFsc2UsImNvbW11bml0eSI6ZmFsc2UsInZpcCI6ZmFsc2UsImVtcGxveWVlIjpmYWxzZSwiYWxsb3dfbnNmdyI6ZmFsc2UsInRlc3RlciI6ZmFsc2UsImNvb2xkb3duc19yZW1vdmVkIjpmYWxzZSwiYmxvY2tlZCI6ZmFsc2UsImNhbl90ZXN0IjpmYWxzZSwiaXNfc3Vic2NyaWJlciI6dHJ1ZSwiY2FuX3ByaXZhdGUiOmZhbHNlLCJjYW5fcmVsYXgiOnRydWUsImlzX3RyaWFsIjpmYWxzZX0sIndlYnNvY2tldEFjY2Vzc1Rva2VuIjoiZXlKMWMyVnlYMmxrSWpvaVpqWTJZbUUyTlRZdFptTXhZaTAwTXpZMkxUaGxZemd0WTJZMU1tTmlZelEzTXpBNUlpd2lkWE5sY201aGJXVWlPaUpoTG0xalpDNGlMQ0pwWVhRaU9qRTJPVGd4TURZNU56Ujkuc2tmUWE1bnpRaUdkdExZcmNtamFrQmw3bGRyLXhqOHVWR2l4azVsRGV5RSJ9; customSettings_v4=%7B%22stylize%22%3A100%7D; darkMode=enabled; __cf_bm=vPXQMOcaGhXT1kGWRwnp0uQm0g4yHfJwUygVKry.k8s-1698107339-0-ARCMqspLCIah6tr4c/NUXn3GihbYc2OLA0qw0Pz/iBQ6Fdbe0cpP+eFkQZxZOr5IEwsMClfrC1CwFByUiS09VhQ=; AMP_74801b10c7=JTdCJTIyZGV2aWNlSWQlMjIlM0ElMjJmMTFlNDU1NC1kYjBkLTRmY2EtODYxOS0zN2VlZDc3MmMxYjElMjIlMkMlMjJ1c2VySWQlMjIlM0ElN0IlMjJkZWZhdWx0VHJhY2tpbmclMjIlM0ElN0IlMjJmaWxlRG93bmxvYWRzJTIyJTNBZmFsc2UlMkMlMjJmb3JtSW50ZXJhY3Rpb25zJTIyJTNBZmFsc2UlMkMlMjJwYWdlVmlld3MlMjIlM0FmYWxzZSUyQyUyMnNlc3Npb25zJTIyJTNBZmFsc2UlN0QlN0QlMkMlMjJzZXNzaW9uSWQlMjIlM0ExNjk4MTA2OTYyMTgzJTJDJTIyb3B0T3V0JTIyJTNBZmFsc2UlMkMlMjJsYXN0RXZlbnRUaW1lJTIyJTNBMTY5ODEwNjk5MTM0MCUyQyUyMmxhc3RFdmVudElkJTIyJTNBMSU3RA==",
-              "Referer": "https://beta.midjourney.com/imagine",
-              "Referrer-Policy": "origin-when-cross-origin"
-            },
-            "body": null,
-            "method": "GET"
-          });
-
-
-
-
+    do {
+        let response = await fetch("https://beta.midjourney.com/api/pg/thomas-jobs?user_id=" + userUUID + "&page_size=10000" + (cursor == "" ? "" : "&cursor=" + cursor));
         let data = await response.json();
-        console.log({data});
-        if(data.data.length == 0)break;
+        // console.log({data});
+        if (data.data.length == 0) break;
         numberOfJobsReturned = data.data.length;
         // put all the returned data into the returnedData array
         returnedData.push(...(data.data));
         cursor = data.cursor;
         loopCount++;
-        if(loopCount > 100)break;
-    }while(numberOfJobsReturned == 10000)
+        if (loopCount > 100) break; // if we've returned more than 1,000,000 jobs, there's probably something wrong, and there's gonna be problems
+    } while (numberOfJobsReturned == 10000)
     return returnedData;
 }
 
 const getUserID = async () => {
     const response = await fetch("https://www.midjourney.com/api/auth/session/");
     const data = await response.json();
-    console.log(data.user.id);
+    // console.log(data.user.id);
     return data.user.id;
 }
 
 const getUserData = async (uuid) => {
     const response = await fetch("https://www.midjourney.com/api/app/users/?userIds=" + uuid);
     const data = await response.json();
-    console.log(data);
+    // console.log(data);
     return data;
 }
 
 const getJobDataImage = async (uuid) => {
-    console.log({ uuid });
+    // console.log({ uuid });
     let jobStatusResponse;
     let fetchWait = fetch("https://www.midjourney.com/api/app/job-status/", {
         method: "POST",
@@ -307,24 +282,50 @@ const getJobDataImage = async (uuid) => {
         jobStatusResponse = response;
     }).catch((error) => {
         console.log({ error });
-        // redoJobs.push(uuid);
     });
     await Promise.all([fetchWait]);
     if (jobStatusResponse.status !== 200) {
         console.log({ jobStatusResponse });
-        // redoJobs.push(uuid);
         return null;
     }
     const jobStatusData = await jobStatusResponse.json();
     return jobStatusData;
 }
 
+const getIfJobUserOrImage = async (uuid) => {
+    let ret = {};
+    let userData = await getUserData(uuid);
+    // console.log({ userData });
+    if (userData.length > 0) {
+        // this is a user
+        ret.type = "user";
+        ret.data = userData;
+        return ret;
+    }
+    let imageData = await getJobDataImage(uuid);
+    // console.log({ imageData });
+    if (imageData.hasOwnProperty('_job_type')) {
+        // this is an image
+        if (imageData.image_paths.length > 1) {
+            ret.type = "grid";
+            ret.data = imageData;
+            return ret;
+        }
+        ret.type = "image";
+        ret.data = imageData;
+        return ret;
+    }
+    ret.type = "unknown";
+    ret.data = {};
+    return ret;
+}
+
 const getJobStatus = () => {
     return jobStatus;
 }
-    
 
-const reloadExtension = ()=>{
+
+const reloadExtension = () => {
     console.log("Reloading extension");
     chrome.runtime.reload();
 }
