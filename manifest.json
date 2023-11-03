@@ -39,6 +39,16 @@
             "js": [
                 "content.js"
             ]
+        },
+        {
+            "matches": [
+                "https://www.midjourney.com/*",
+                "https://www.beta.midjourney.com/*",
+                "https://beta.midjourney.com/*"
+            ],
+            "js": [
+                "MJcontent.js"
+            ]
         }
     ]
 }
